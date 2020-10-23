@@ -54,6 +54,12 @@ sys_getpid(void)
 }
 
 int
+sys_getpinfos(void)
+{
+  return getpinfos();
+}
+
+int
 sys_sbrk(void)
 {
   int addr;

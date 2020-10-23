@@ -122,6 +122,7 @@ int             waitx(int *wtime, int *rtime);
 void            wakeup(void*);
 void            yield(void);
 void            updateRuntime(void);
+int             getpinfos(void);
 
 // swtch.S
 void            swtch(struct context**, struct context*);
