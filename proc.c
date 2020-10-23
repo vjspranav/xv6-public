@@ -318,6 +318,19 @@ wait(void)
   }
 }
 
+// Loops through all the running processes and updates
+// their run time.
+// Referencing the above wait function
+void updateRuntime(void){
+  struct proc *p;
+  acquire(&ptable.lock);
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->state==RUNNING)
+      p->rtime+=1;
+  }
+  release(&ptable.lock);
+}
+
 //PAGEBREAK: 42
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
