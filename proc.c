@@ -116,6 +116,8 @@ found:
   p->ctime=ticks;
   p->rtime=0;
   p->etime=0;
+  p->wtime=0;
+  p->queue[0]=p->queue[1]=p->queue[2]=p->queue[3]=p->queue[4]=0;
   return p;
 }
 
@@ -307,6 +309,7 @@ wait(void)
         p->ctime=0;
         p->rtime=0;
         p->etime=0;
+        p->wtime=0;
         release(&ptable.lock);
         return pid;
       }
@@ -344,7 +347,7 @@ waitx(int *wtime, int *rtime)
         // Found one.
         pid = p->pid;
         *rtime=p->rtime;
-        *wtime=(p->etime-p->ctime)-p->rtime;
+        *wtime=p->wtime;
         kfree(p->kstack);
         p->kstack = 0;
         freevm(p->pgdir);
@@ -357,6 +360,7 @@ waitx(int *wtime, int *rtime)
         p->ctime=0;
         p->rtime=0;
         p->etime=0;
+        p->wtime=0;
         release(&ptable.lock);
         return pid;
       }
@@ -382,6 +386,8 @@ void updateRuntime(void){
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->state==RUNNING)
       p->rtime+=1;
+    if(p->state==RUNNABLE)
+      p->wtime+=1;
   }
   release(&ptable.lock);
 }
@@ -574,11 +580,19 @@ kill(int pid)
 // Print all running process infos
 int
 getpinfos(void){
+  static char *states[] = {
+  [UNUSED]    "unused",
+  [EMBRYO]    "embryo",
+  [SLEEPING]  "sleep ",
+  [RUNNABLE]  "runble",
+  [RUNNING]   "run   ",
+  [ZOMBIE]    "zombie"
+  };
   cprintf("PID\tPriority\tState\tr_time\tw_time\tn_run\tcur_q\tq0\tq1\tq2\tq3\tq4\n");
   struct proc *p;
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->state!=0){
-      cprintf("%d\t%d\t\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n", p->pid, 0, p->state, p->rtime, (p->etime-p->ctime)-p->rtime, 0, 0, 0, 0, 0, 0, 0);
+      cprintf("%d\t%d\t\t%s\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n", p->pid, 0, states[p->state], p->rtime, p->wtime, 0, 0, p->queue[0], p->queue[1], p->queue[2], p->queue[3], p->queue[4]);
     }
   }
   return 0;
