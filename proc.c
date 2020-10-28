@@ -588,12 +588,17 @@ getpinfos(void){
   [RUNNING]   "run   ",
   [ZOMBIE]    "zombie"
   };
+  char *state;
   cprintf("PID\tPriority\tState\tr_time\tw_time\tn_run\tcur_q\tq0\tq1\tq2\tq3\tq4\n");
   struct proc *p;
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-    if(p->state!=0){
+    if(p->state == UNUSED)
+      continue;
+    if(p->state >= 0 && p->state < NELEM(states) && states[p->state])
+      state = states[p->state];
+    else
+      state = "???";
       cprintf("%d\t%d\t\t%s\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n", p->pid, 0, states[p->state], p->rtime, p->wtime, 0, 0, p->queue[0], p->queue[1], p->queue[2], p->queue[3], p->queue[4]);
-    }
   }
   return 0;
 }
