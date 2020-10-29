@@ -53,7 +53,8 @@ struct proc {
   int etime;		       // Process end time
   int rtime;		       // Process run time
   int wtime;           // Process wait time (Arggh just store it)
-  int queue[5];         // How many times each queue called it.
+  int queue[5];        // How many times each queue called it.
+  int n_run;           // Number of times the process has been called 
 };
 
 // Process memory is laid out contiguously, low addresses first:

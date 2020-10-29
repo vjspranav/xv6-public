@@ -88,7 +88,15 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
-
+  
+  // Add Process start time and add process end time 
+  p->ctime=ticks;
+  p->rtime=0;
+  p->etime=0;
+  p->wtime=0;
+  p->n_run=0;
+  p->queue[0]=p->queue[1]=p->queue[2]=p->queue[3]=p->queue[4]=0;
+  
   release(&ptable.lock);
 
   // Allocate kernel stack.
@@ -112,12 +120,6 @@ found:
   memset(p->context, 0, sizeof *p->context);
   p->context->eip = (uint)forkret;
 
-  // Add Process start time and add process end time 
-  p->ctime=ticks;
-  p->rtime=0;
-  p->etime=0;
-  p->wtime=0;
-  p->queue[0]=p->queue[1]=p->queue[2]=p->queue[3]=p->queue[4]=0;
   return p;
 }
 
@@ -310,6 +312,7 @@ wait(void)
         p->rtime=0;
         p->etime=0;
         p->wtime=0;
+        p->n_run=0;
         release(&ptable.lock);
         return pid;
       }
@@ -361,6 +364,7 @@ waitx(int *wtime, int *rtime)
         p->rtime=0;
         p->etime=0;
         p->wtime=0;
+        p->n_run=0;
         release(&ptable.lock);
         return pid;
       }
@@ -386,7 +390,7 @@ void updateRuntime(void){
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->state==RUNNING)
       p->rtime+=1;
-    if(p->state==RUNNABLE)
+    else if(p->state!=RUNNABLE)
       p->wtime+=1;
   }
   release(&ptable.lock);
@@ -403,36 +407,75 @@ void updateRuntime(void){
 void
 scheduler(void)
 {
-  struct proc *p;
-  struct cpu *c = mycpu();
-  c->proc = 0;
-  
-  for(;;){
-    // Enable interrupts on this processor.
-    sti();
+    struct proc *p;
+    struct cpu *c = mycpu();
+    c->proc = 0;
+    
+    for(;;){
+      // Enable interrupts on this processor.
+      sti();
 
-    // Loop over process table looking for process to run.
-    acquire(&ptable.lock);
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
-        continue;
 
-      // Switch to chosen process.  It is the process's job
-      // to release ptable.lock and then reacquire it
-      // before jumping back to us.
-      c->proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
+  #ifdef DEFAULT
+      // Loop over process table looking for process to run.
+      acquire(&ptable.lock);
+      for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+        if(p->state != RUNNABLE)
+          continue;
 
-      swtch(&(c->scheduler), p->context);
-      switchkvm();
+        // Switch to chosen process.  It is the process's job
+        // to release ptable.lock and then reacquire it
+        // before jumping back to us.
+        c->proc = p;
+        switchuvm(p);
+        p->state = RUNNING;
+        p->n_run+=1;
+        swtch(&(c->scheduler), p->context);
+        switchkvm();
 
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
-      c->proc = 0;
-    }
-    release(&ptable.lock);
+        // Process is done running for now.
+        // It should have changed its p->state before coming back.
+        c->proc = 0;
+      }
+      release(&ptable.lock);
+  #endif
+  #ifdef FCFS
+      struct proc *fp=0;
+      // Loop over process table looking for process to run.
+      acquire(&ptable.lock);
+      for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+        if(p->state != RUNNABLE)
+          continue;
+        if(!fp)
+          fp=p;
+        else if(p->ctime<fp->ctime){
+          fp=p;
+        }
+      }
+      if(fp){
+        p=fp;
+        // Switch to chosen process.  It is the process's job
+        // to release ptable.lock and then reacquire it
+        // before jumping back to us.
+        c->proc = p;
+        switchuvm(p);
+        p->state = RUNNING;
+        p->n_run+=1;
+        swtch(&(c->scheduler), p->context);
+        switchkvm();
 
+        // Process is done running for now.
+        // It should have changed its p->state before coming back.
+        c->proc = 0;
+      }
+      release(&ptable.lock);
+  #endif
+  #ifdef PRIORITY
+    cprintf("Using Priority");
+  #endif
+  #ifdef MLFQ
+    cprintf("Using MLFQ");
+  #endif
   }
 }
 
@@ -588,18 +631,7 @@ getpinfos(void){
   [RUNNING]   "run   ",
   [ZOMBIE]    "zombie"
   };
-  #ifdef DEFAULT
-    cprintf("Using Roundrobin");
-  #endif
-  #ifdef FCFS
-    cprintf("Using FCFS");
-  #endif
-  #ifdef PRIORITY
-    cprintf("Using Priority");
-  #endif
-  #ifdef MLFQ
-    cprintf("Using MLFQ");
-  #endif
+
   char *state;
   cprintf("\nPID\tPriority\tState\tr_time\tw_time\tn_run\tcur_q\tq0\tq1\tq2\tq3\tq4\n");
   struct proc *p;
@@ -610,7 +642,7 @@ getpinfos(void){
       state = states[p->state];
     else
       state = "???";
-    cprintf("%d\t%d\t\t%s\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n", p->pid, 0, state, p->rtime, p->wtime, 0, 0, p->queue[0], p->queue[1], p->queue[2], p->queue[3], p->queue[4]);
+    cprintf("%d\t%d\t\t%s\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n", p->pid, 0, state, p->rtime, p->wtime, p->n_run, 0, p->queue[0], p->queue[1], p->queue[2], p->queue[3], p->queue[4]);
   }
   return 0;
 }
