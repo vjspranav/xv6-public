@@ -49,12 +49,16 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
-  int ctime;		       // Process creation time
-  int etime;		       // Process end time
-  int rtime;		       // Process run time
-  int wtime;           // Process wait time (Arggh just store it)
-  int queue[5];        // How many times each queue called it.
-  int n_run;           // Number of times the process has been called 
+  int priority;                // Priority of the process;
+  int ctime;		               // Process creation time
+  int etime;		               // Process end time
+  int rtime;		               // Process run time
+  int wtime;                   // Process wait time (Arggh just store it)
+  int twtime;                  // What formula I don't care, I''ll store total wait time too.
+  int iotime;                  // IO Time, time when sleeps
+  int queue[5];                // How many times each queue called it.
+  int cur_q;
+  int n_run;                   // Number of times the process has been called 
 };
 
 // Process memory is laid out contiguously, low addresses first:

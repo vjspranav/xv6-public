@@ -94,6 +94,10 @@ found:
   p->rtime=0;
   p->etime=0;
   p->wtime=0;
+  p->twtime=0;
+  p->iotime=0;
+  p->priority=60;
+  p->cur_q=0;
   p->n_run=0;
   p->queue[0]=p->queue[1]=p->queue[2]=p->queue[3]=p->queue[4]=0;
   
@@ -312,6 +316,9 @@ wait(void)
         p->rtime=0;
         p->etime=0;
         p->wtime=0;
+        p->twtime=0;
+        p->priority=60;
+        p->cur_q=0;
         p->n_run=0;
         release(&ptable.lock);
         return pid;
@@ -350,7 +357,7 @@ waitx(int *wtime, int *rtime)
         // Found one.
         pid = p->pid;
         *rtime=p->rtime;
-        *wtime=p->wtime;
+        *wtime=p->twtime;
         kfree(p->kstack);
         p->kstack = 0;
         freevm(p->pgdir);
@@ -364,6 +371,10 @@ waitx(int *wtime, int *rtime)
         p->rtime=0;
         p->etime=0;
         p->wtime=0;
+        p->twtime=0;
+        p->iotime=0;
+        p->priority=60;
+        p->cur_q=0;
         p->n_run=0;
         release(&ptable.lock);
         return pid;
@@ -389,9 +400,13 @@ void updateRuntime(void){
   acquire(&ptable.lock);
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->state==RUNNING)
-      p->rtime+=1;
-    else if(p->state!=RUNNABLE)
-      p->wtime+=1;
+      p->rtime++;
+    if(p->state==RUNNABLE){
+      p->wtime++;
+      p->twtime++;
+    }
+    if(p->state==SLEEPING)
+      p->iotime++;
   }
   release(&ptable.lock);
 }
@@ -430,6 +445,7 @@ scheduler(void)
         switchuvm(p);
         p->state = RUNNING;
         p->n_run+=1;
+        p->wtime=0;
         swtch(&(c->scheduler), p->context);
         switchkvm();
 
@@ -461,6 +477,7 @@ scheduler(void)
         switchuvm(p);
         p->state = RUNNING;
         p->n_run+=1;
+        p->wtime=0;
         swtch(&(c->scheduler), p->context);
         switchkvm();
 
@@ -642,7 +659,7 @@ getpinfos(void){
       state = states[p->state];
     else
       state = "???";
-    cprintf("%d\t%d\t\t%s\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n", p->pid, 0, state, p->rtime, p->wtime, p->n_run, 0, p->queue[0], p->queue[1], p->queue[2], p->queue[3], p->queue[4]);
+    cprintf("%d\t%d\t\t%s\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n", p->pid, p->priority, state, p->rtime, p->wtime, p->n_run, p->cur_q, p->queue[0], p->queue[1], p->queue[2], p->queue[3], p->queue[4]);
   }
   return 0;
 }

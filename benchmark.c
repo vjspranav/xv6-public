@@ -40,9 +40,9 @@ int main(int argc, char *argv[])
     //   set_priority(100-(20+j),pid); // will only matter for PBS, comment it out if not implemented yet (better priorty for more IO intensive jobs)
     }
   }
-  for (j = 0; j < number_of_processes+5; j++)
-  {
-   wait();
-  }
+  // for (j = 0; j < number_of_processes+5; j++)
+  // {
+  //  wait();
+  // }
   exit();
 }
