@@ -411,6 +411,22 @@ void updateRuntime(void){
   release(&ptable.lock);
 }
 
+int set_priority(int new_priority, int pid){
+  if(new_priority<0 || new_priority>100)
+    return -1;
+  int oldp=-1;
+  struct proc *p;
+  acquire(&ptable.lock);
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->pid==pid){
+      oldp=p->priority;
+      p->priority=new_priority;
+    }
+  }
+  release(&ptable.lock);
+  return oldp;
+}
+
 //PAGEBREAK: 42
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
@@ -488,7 +504,36 @@ scheduler(void)
       release(&ptable.lock);
   #endif
   #ifdef PRIORITY
-    cprintf("Using Priority");
+    struct proc *hp=0;
+      // Loop over process table looking for process to run.
+      acquire(&ptable.lock);
+      for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+        if(p->state != RUNNABLE)
+          continue;
+        if(!hp)
+          hp=p;
+        else if(p->priority<hp->priority){
+          hp=p;
+        }
+      }
+      if(hp){
+        p=hp;
+        // Switch to chosen process.  It is the process's job
+        // to release ptable.lock and then reacquire it
+        // before jumping back to us.
+        c->proc = p;
+        switchuvm(p);
+        p->state = RUNNING;
+        p->n_run+=1;
+        p->wtime=0;
+        swtch(&(c->scheduler), p->context);
+        switchkvm();
+
+        // Process is done running for now.
+        // It should have changed its p->state before coming back.
+        c->proc = 0;
+      }
+      release(&ptable.lock);
   #endif
   #ifdef MLFQ
     cprintf("Using MLFQ");
