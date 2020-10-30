@@ -85,7 +85,7 @@ LDFLAGS += -m $(shell $(LD) -V | grep elf_i386 2>/dev/null | head -n 1)
 ifeq ($(SCHEDULER),FCFS)
 	CFLAGS +="-DFCFS"
 else
-	ifeq ($(SCHEDULER),PRIORITY)
+	ifeq ($(SCHEDULER),PBS)
 		CFLAGS +="-DPRIORITY"
 	else
 		ifeq ($(SCHEDULER),MLFQ)
