@@ -44,6 +44,9 @@ int sys_set_priority(void)
     return -1;
   if(argint(1, &pid) < 0)
     return -1;
+  // Make sure priority is between 0 and 100
+  if(new_priority<0 || new_priority>100)
+    return -1;
   return set_priority(new_priority, pid);
 }
 
