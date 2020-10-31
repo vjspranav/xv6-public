@@ -59,6 +59,7 @@ struct proc {
   int queue[5];                // How many times each queue called it.
   int cur_q;                   // The current queue in which the process is
   int n_run;                   // Number of times the process has been called 
+  int mlfq_time;               // Time in ticks for that process in the queue.
 };
 
 // Process memory is laid out contiguously, low addresses first:

@@ -101,6 +101,9 @@ found:
   p->n_run=0;
   p->queue[0]=p->queue[1]=p->queue[2]=p->queue[3]=p->queue[4]=0;
   
+  #ifdef MLFQ
+  p->mlfq_time=1;
+  #endif
   release(&ptable.lock);
 
   // Allocate kernel stack.
@@ -399,14 +402,20 @@ void updateRuntime(void){
   struct proc *p;
   acquire(&ptable.lock);
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-    if(p->state==RUNNING)
+    if(p->state==RUNNING){
       p->rtime++;
+    }
     if(p->state==RUNNABLE){
       p->wtime++;
       p->twtime++;
     }
     if(p->state==SLEEPING)
       p->iotime++;
+    
+    #ifdef MLFQ
+    p->mlfq_time--;
+    p->queue[p->cur_q]++;
+    #endif
   }
   release(&ptable.lock);
 }
@@ -438,6 +447,7 @@ int set_priority(int new_priority, int pid){
 void
 scheduler(void)
 {
+    int mlfqTime[]={1, 2, 4, 8, 16};
     struct proc *p;
     struct cpu *c = mycpu();
     c->proc = 0;
@@ -536,7 +546,74 @@ scheduler(void)
       release(&ptable.lock);
   #endif
   #ifdef MLFQ
-    cprintf("Using MLFQ");
+    int i;
+    acquire(&ptable.lock);
+    // Check if any process has crossed it's time in queue
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->state!=RUNNABLE)
+        continue;
+      if(p->mlfq_time<=0){
+        if(p->cur_q!=4){
+          p->cur_q++;
+          p->mlfq_time=mlfqTime[p->cur_q];
+          p->wtime=0;
+        }
+      }
+    }
+    for(i=0;i<4;i++){
+      struct proc *hp=0;
+      for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+        if(p->cur_q==i){
+          if(p->state != RUNNABLE)
+              continue;
+          if(!hp)
+            hp=p;
+          else if(p->priority<hp->priority){
+            hp=p;
+          }
+        }
+      }
+      if(hp){
+        p=hp;
+        p->mlfq_time=mlfqTime[i];
+        // Switch to chosen process.  It is the process's job
+        // to release ptable.lock and then reacquire it
+        // before jumping back to us.
+        c->proc = p;
+        switchuvm(p);
+        p->state = RUNNING;
+        p->n_run+=1;
+        p->wtime=0;
+        swtch(&(c->scheduler), p->context);
+        switchkvm();
+
+        // Process is done running for now.
+        // It should have changed its p->state before coming back.
+        c->proc = 0;
+      }
+    }
+
+    // Queue 4 runs round robin
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+        if(p->state != RUNNABLE || p->cur_q!=4)
+          continue;
+
+        // Switch to chosen process.  It is the process's job
+        // to release ptable.lock and then reacquire it
+        // before jumping back to us.
+        c->proc = p;
+        switchuvm(p);
+        p->state = RUNNING;
+        p->n_run+=1;
+        p->wtime=0;
+        swtch(&(c->scheduler), p->context);
+        switchkvm();
+
+        // Process is done running for now.
+        // It should have changed its p->state before coming back.
+        c->proc = 0;
+      }    
+      release(&ptable.lock);
   #endif
   }
 }
