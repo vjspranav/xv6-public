@@ -20,6 +20,10 @@ extern void trapret(void);
 
 static void wakeup1(void *chan);
 
+#ifdef MLFQ
+struct pQueue queue[5];
+#endif
+
 void
 pinit(void)
 {
@@ -102,7 +106,8 @@ found:
   p->queue[0]=p->queue[1]=p->queue[2]=p->queue[3]=p->queue[4]=0;
   #ifdef MLFQ
   p->mlfq_time=1;
-  p->inqueuefrom=ticks;  
+  p->inqueuefrom=ticks;
+  p->mlfqprior=0;  
   #endif
   release(&ptable.lock);
 
@@ -447,7 +452,6 @@ int set_priority(int new_priority, int pid){
 void
 scheduler(void)
 {
-    int mlfqTime[]={1, 2, 4, 8, 16};
     struct proc *p;
     struct cpu *c = mycpu();
     c->proc = 0;
@@ -546,7 +550,8 @@ scheduler(void)
       release(&ptable.lock);
   #endif
   #ifdef MLFQ
-    int i;
+    int mlfqTime[]={1, 2, 4, 8, 16};
+    struct proc *hp=0;
     acquire(&ptable.lock);
     // Check if any process has crossed it's time in queue
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
@@ -557,6 +562,7 @@ scheduler(void)
           //cprintf("\nprocess %d exceeded time slice moving to lower queue %d, wtime so far=%d\n", p->pid, p->cur_q+1, p->wtime);
           p->cur_q++;
           p->mlfq_time=mlfqTime[p->cur_q];
+          p->mlfqprior=queue[p->cur_q].curSize++;
           p->wtime=0;
         }
       }
@@ -571,18 +577,26 @@ scheduler(void)
           //cprintf("\nprocess %d Aged moving to higher queue %d, wtime so far=%d\n", p->pid, p->cur_q-1, p->wtime);
           p->cur_q--;
           p->mlfq_time=mlfqTime[p->cur_q];
+          p->mlfqprior=queue[p->cur_q].curSize++;
           p->wtime=0;
         }
       }
     }
 
-    for(i=0;i<5;i++){
-      for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-        if(p->state != RUNNABLE)
-          continue;
-        if(p->cur_q==i){
-          p->mlfq_time=mlfqTime[i];
-    
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->state != RUNNABLE)
+        continue;
+      if(!hp)
+        hp=p;
+      else if(p->cur_q<hp->cur_q){
+        hp=p;
+      }else if(p->cur_q==hp->cur_q){
+        if(p->mlfqprior<hp->mlfqprior)
+          hp=p;
+      }
+    }
+    if(hp){
+      p=hp;
       // Swi3.0tch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
       // before jumping back to us.
@@ -597,10 +611,8 @@ scheduler(void)
       // Process is done running for now.
       // It should have changed its p->state before coming back.
       c->proc = 0;
-         }
-      }
     }
-      release(&ptable.lock);
+    release(&ptable.lock);
   #endif
   }
 }

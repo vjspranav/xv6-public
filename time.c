@@ -5,6 +5,10 @@
 int
 main(int argc, char *argv[])
 {
+  if(argc<2){
+    printf(1, "Expected 2 arguments, got %d\n", argc);
+    exit();
+  }
   int f=fork();
   if(f==0){
       exec(argv[1], argv+1);

@@ -50,6 +50,7 @@ struct proc {
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
   int priority;                // Priority of the process;
+  int mlfqprior;               // An int to show position in queue
   int ctime;                   // Process creation time
   int etime;                   // Process end time
   int rtime;                   // Process run time
@@ -61,6 +62,11 @@ struct proc {
   int n_run;                   // Number of times the process has been called 
   int mlfq_time;               // Time in ticks for that process in the queue.
   int inqueuefrom;             // The time at which it entered queue
+};
+
+// Kind of a queue :P
+struct pQueue{
+  int curSize;
 };
 
 // Process memory is laid out contiguously, low addresses first:
