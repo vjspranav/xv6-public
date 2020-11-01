@@ -323,8 +323,6 @@ wait(void)
         p->ctime=0;
         p->rtime=0;
         p->etime=0;
-        p->wtime=0;
-        p->twtime=0;
         p->priority=60;
         p->cur_q=0;
         p->n_run=0;
@@ -378,8 +376,6 @@ waitx(int *wtime, int *rtime)
         p->ctime=0;
         p->rtime=0;
         p->etime=0;
-        p->wtime=0;
-        p->twtime=0;
         p->iotime=0;
         p->priority=60;
         p->cur_q=0;
@@ -414,7 +410,7 @@ void updateRuntime(void){
       p->queue[p->cur_q]++;
       #endif
     }
-    if(p->state==RUNNABLE){
+    if(p->state!=RUNNABLE){
       p->wtime++;
       p->twtime++;
     }
@@ -569,9 +565,7 @@ scheduler(void)
     }
 
     // Aging
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state!=RUNNABLE)
-        continue;
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
       if(ticks - p->inqueuefrom > 1500){
         if(p->cur_q!=0){
           //cprintf("\nprocess %d Aged moving to higher queue %d, wtime so far=%d\n", p->pid, p->cur_q-1, p->wtime);
@@ -581,7 +575,6 @@ scheduler(void)
           p->wtime=0;
         }
       }
-    }
 
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
