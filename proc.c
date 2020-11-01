@@ -101,16 +101,13 @@ found:
   p->twtime=0;
   p->iotime=0;
   p->priority=60;
-  #ifndef MLFQ
-  p->cur_q=-1;
-  #endif
+  p->cur_q=0;
   p->n_run=0;
   p->queue[0]=p->queue[1]=p->queue[2]=p->queue[3]=p->queue[4]=0;
   #ifdef MLFQ
   p->mlfq_time=1;
   p->inqueuefrom=ticks;
   p->mlfqprior=0;  
-  p->cur_q=0;
   #endif
   release(&ptable.lock);
 
@@ -327,7 +324,7 @@ wait(void)
         p->rtime=0;
         p->etime=0;
         p->priority=60;
-        p->cur_q=-1;
+        p->cur_q=0;
         p->n_run=0;
         release(&ptable.lock);
         return pid;
@@ -381,7 +378,7 @@ waitx(int *wtime, int *rtime)
         p->etime=0;
         p->iotime=0;
         p->priority=60;
-        p->cur_q=-1;
+        p->cur_q=0;
         p->n_run=0;
         release(&ptable.lock);
         return pid;
