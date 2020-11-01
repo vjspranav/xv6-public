@@ -100,9 +100,9 @@ found:
   p->cur_q=0;
   p->n_run=0;
   p->queue[0]=p->queue[1]=p->queue[2]=p->queue[3]=p->queue[4]=0;
-  
   #ifdef MLFQ
   p->mlfq_time=1;
+  p->inqueuefrom=ticks;  
   #endif
   release(&ptable.lock);
 
@@ -404,6 +404,10 @@ void updateRuntime(void){
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->state==RUNNING){
       p->rtime++;
+      #ifdef MLFQ
+      p->mlfq_time--;
+      p->queue[p->cur_q]++;
+      #endif
     }
     if(p->state==RUNNABLE){
       p->wtime++;
@@ -412,10 +416,6 @@ void updateRuntime(void){
     if(p->state==SLEEPING)
       p->iotime++;
     
-    #ifdef MLFQ
-    p->mlfq_time--;
-    p->queue[p->cur_q]++;
-    #endif
   }
   release(&ptable.lock);
 }
@@ -554,65 +554,52 @@ scheduler(void)
         continue;
       if(p->mlfq_time<=0){
         if(p->cur_q!=4){
+          //cprintf("\nprocess %d exceeded time slice moving to lower queue %d, wtime so far=%d\n", p->pid, p->cur_q+1, p->wtime);
           p->cur_q++;
           p->mlfq_time=mlfqTime[p->cur_q];
           p->wtime=0;
         }
       }
     }
-    for(i=0;i<4;i++){
-      struct proc *hp=0;
-      for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-        if(p->cur_q==i){
-          if(p->state != RUNNABLE)
-              continue;
-          if(!hp)
-            hp=p;
-          else if(p->priority<hp->priority){
-            hp=p;
-          }
-        }
-      }
-      if(hp){
-        p=hp;
-        p->mlfq_time=mlfqTime[i];
-        // Switch to chosen process.  It is the process's job
-        // to release ptable.lock and then reacquire it
-        // before jumping back to us.
-        c->proc = p;
-        switchuvm(p);
-        p->state = RUNNING;
-        p->n_run+=1;
-        p->wtime=0;
-        swtch(&(c->scheduler), p->context);
-        switchkvm();
 
-        // Process is done running for now.
-        // It should have changed its p->state before coming back.
-        c->proc = 0;
+    // Aging
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->state!=RUNNABLE)
+        continue;
+      if(ticks - p->inqueuefrom > 1500){
+        if(p->cur_q!=0){
+          //cprintf("\nprocess %d Aged moving to higher queue %d, wtime so far=%d\n", p->pid, p->cur_q-1, p->wtime);
+          p->cur_q--;
+          p->mlfq_time=mlfqTime[p->cur_q];
+          p->wtime=0;
+        }
       }
     }
 
-    // Queue 4 runs round robin
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-        if(p->state != RUNNABLE || p->cur_q!=4)
+    for(i=0;i<5;i++){
+      for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+        if(p->state != RUNNABLE)
           continue;
+        if(p->cur_q==i){
+          p->mlfq_time=mlfqTime[i];
+    
+      // Swi3.0tch to chosen process.  It is the process's job
+      // to release ptable.lock and then reacquire it
+      // before jumping back to us.
+      c->proc = p;
+      switchuvm(p);
+      p->state = RUNNING;
+      p->n_run+=1;
+      p->wtime=0;
+      swtch(&(c->scheduler), p->context);
+      switchkvm();
 
-        // Switch to chosen process.  It is the process's job
-        // to release ptable.lock and then reacquire it
-        // before jumping back to us.
-        c->proc = p;
-        switchuvm(p);
-        p->state = RUNNING;
-        p->n_run+=1;
-        p->wtime=0;
-        swtch(&(c->scheduler), p->context);
-        switchkvm();
-
-        // Process is done running for now.
-        // It should have changed its p->state before coming back.
-        c->proc = 0;
-      }    
+      // Process is done running for now.
+      // It should have changed its p->state before coming back.
+      c->proc = 0;
+         }
+      }
+    }
       release(&ptable.lock);
   #endif
   }
