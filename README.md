@@ -81,7 +81,7 @@ It extracts the details from the extended proc structure and prints it.
 > wtime is majorly shown 0 as the temporary wait time is too fast to be noticed and printed.
 
 # Scheduler
-Code: 
+Code:
 ```
     struct proc *p;
     struct cpu *c = mycpu();
