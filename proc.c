@@ -108,6 +108,8 @@ found:
   p->mlfq_time=1;
   p->inqueuefrom=ticks;
   p->mlfqprior=0;  
+  p->cur_q=0;
+  //cprintf("%d,%d,%d\n", p->pid, ticks, p->cur_q);
   #endif
   release(&ptable.lock);
 
@@ -309,6 +311,7 @@ wait(void)
         continue;
       havekids = 1;
       if(p->state == ZOMBIE){
+        //cprintf("%d,%d,%d\n", p->pid, ticks, p->cur_q);
         // Found one.
         pid = p->pid;
         kfree(p->kstack);
@@ -410,7 +413,7 @@ void updateRuntime(void){
       p->queue[p->cur_q]++;
       #endif
     }
-    if(p->state!=RUNNABLE){
+    if(p->state==RUNNABLE){
       p->wtime++;
       p->twtime++;
     }
@@ -560,6 +563,7 @@ scheduler(void)
           p->mlfq_time=mlfqTime[p->cur_q];
           p->mlfqprior=queue[p->cur_q].curSize++;
           p->wtime=0;
+          //cprintf("%d,%d,%d\n", p->pid, ticks, p->cur_q);
         }
       }
     }
@@ -573,6 +577,7 @@ scheduler(void)
           p->mlfq_time=mlfqTime[p->cur_q];
           p->mlfqprior=queue[p->cur_q].curSize++;
           p->wtime=0;
+          //cprintf("%d,%d,%d\n", p->pid, ticks, p->cur_q);
         }
       }
 
