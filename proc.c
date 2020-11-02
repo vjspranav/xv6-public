@@ -699,6 +699,10 @@ sleep(void *chan, struct spinlock *lk)
   p->chan = chan;
   p->state = SLEEPING;
 
+  #ifdef MLFQ
+  p->mlfqprior=queue[p->cur_q].curSize++;
+  #endif
+
   sched();
 
   // Tidy up.
