@@ -101,7 +101,7 @@ found:
   p->twtime=0;
   p->iotime=0;
   p->priority=60;
-  p->cur_q=0;
+  p->cur_q=-1;
   p->n_run=0;
   p->queue[0]=p->queue[1]=p->queue[2]=p->queue[3]=p->queue[4]=0;
   #ifdef MLFQ
